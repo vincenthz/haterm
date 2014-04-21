@@ -1,0 +1,30 @@
+Name:                haterm
+Version:             0.1.0
+Synopsis:            haskell gtk terminal
+Description:         haskell gtk terminal
+License:             BSD3
+License-file:        LICENSE
+Copyright:           Vincent Hanquez <vincent@snarc.org>
+Author:              Vincent Hanquez <vincent@snarc.org>
+Maintainer:          vincent@snarc.org
+Category:            Tool
+Stability:           experimental
+Build-Type:          Simple
+Homepage:            http://github.com/vincenthz/haterm
+Cabal-Version:       >=1.8
+extra-source-files:  README.md
+
+Executable           haterm
+  Main-Is:           Haterm.hs
+  ghc-options:       -Wall -fno-warn-missing-signatures
+  Hs-Source-Dirs:    src
+  Build-depends:     base >= 4 && < 5
+                   , mtl
+                   , filepath
+                   , containers
+                   , gtk3
+                   , vte3
+
+source-repository head
+  type: git
+  location: git://github.com/vincenthz/haterm
