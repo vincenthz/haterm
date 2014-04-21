@@ -89,7 +89,7 @@ main = do
         background = black
 
     terminalSetColors t foreground background
-        [darkGrey1,red,green,red,red,red,red,red
+        [darkGrey1,red,green,yellow,blue,red,cyanHi,red
         ,darkGrey2,red,greenHi,yellowHi,blueHi,magentaHi,cyanHi,red]
     {-
         [darkGrey1,red,green,yellow,blue,magenta,cyan,grey
