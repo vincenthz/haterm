@@ -5,6 +5,7 @@ import qualified Data.Map as M
 import Control.Applicative
 import Control.Monad (unless)
 import Control.Monad.Trans
+import Control.Monad.Reader
 import qualified Control.Exception as E
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Vte.Vte
@@ -14,7 +15,12 @@ import System.Environment
 import Data.IORef
 
 handled f = f >> return True
+unHandled :: Monad m => m Bool
 unHandled = return False
+
+minimal = 6
+maximal = 16
+fontRange = min maximal . max minimal
 
 resize term width height = do
     (Rectangle _ _ aw ah) <- widgetGetAllocation term
@@ -22,7 +28,7 @@ resize term width height = do
     b  <- widgetGetRealized term
     st <- drawWindowGetState (castToDrawWindow window)
 
-    --putStrLn ("resized " ++ show width ++ "x" ++ show height)
+    putStrLn ("resized " ++ show width ++ "x" ++ show height)
 
     unless (b
         || (WindowStateMaximized `elem` st || WindowStateFullscreen `elem` st)
@@ -37,6 +43,8 @@ resize term width height = do
             terminalSetSize term gWidth gHeight
 
             return ()
+
+tupleDiff (x1,y1) (x2,y2) = (x1-x2, y1-y2)
 
 parseConfig = foldl doAcc M.empty . lines
   where doAcc acc s =
@@ -59,6 +67,8 @@ main = do
     let fontName = "monospace"
     let getFont = readIORef fsz >>= \sz -> return (fontName ++ " " ++ show sz)
 
+    currentSize <- newIORef (0,0)
+
     idproc <- terminalForkCommand t Nothing Nothing Nothing Nothing False False False
     _ <- t `on` childExited $ do
         ces <- terminalGetChildExitStatus t
@@ -69,7 +79,8 @@ main = do
     _ <- t `on` increaseFontSize $ do
             liftIO $ putStrLn "increased"
 
-    let red = Color 0xffff 0 0x0000
+    let red = Color 0xdddd 0 0x0000
+        redHi = Color 0xffff 0 0x0000
         yellow = Color 0xf100 0xbe00 0x2200
         yellowHi = Color 0xffff 0xdc00 0x0000
         blue = Color 0 0 0xffff
@@ -78,7 +89,7 @@ main = do
         greenHi = Color 0xffff 0xdccc 0x0000 -- FFDC00
         white = Color 0xffff 0xffff 0xffff
         black = Color 0x0 0x0 0x0
-        magenta = Color 0x0 0xffff 0xffff
+        magenta = Color 0x9555 0x0eee 0xc222
         magentaHi = Color 0xa555 0x1eee 0xc222 -- #A51EC2
         cyan = Color 0x2300 0x9200 0x8600
         cyanHi = Color 0x1bbb 0xdddd 0xd000 -- #1BDDD0
@@ -89,18 +100,24 @@ main = do
         background = black
 
     terminalSetColors t foreground background
-        [darkGrey1,red,green,yellow,blue,red,cyanHi,red
-        ,darkGrey2,red,greenHi,yellowHi,blueHi,magentaHi,cyanHi,red]
+        [darkGrey1,red,green,yellow,blue,magenta,cyanHi,darkGrey1
+        ,darkGrey2,redHi,greenHi,yellowHi,blueHi,magentaHi,cyanHi,darkGrey2]
     {-
         [darkGrey1,red,green,yellow,blue,magenta,cyan,grey
         ,darkGrey2,red,greenHi,yellowHi,blueHi,magentaHi,cyanHi,grey]
     -}
 
-    let decreaseFont = liftIO $ do
+    let decreaseFont :: MonadIO m => m ()
+        decreaseFont = liftIO $ do
             modifyIORef fsz (\i -> i - 2)
             getFont >>= terminalSetFontFromString t
+        increaseFont :: MonadIO m => m ()
         increaseFont = liftIO $ do
             modifyIORef fsz (+ 2)
+            getFont >>= terminalSetFontFromString t
+        setFont :: MonadIO m => Int -> m ()
+        setFont newSize = liftIO $ do
+            modifyIORef fsz (const newSize)
             getFont >>= terminalSetFontFromString t
         pasteFromClipboard = liftIO $ terminalPasteClipboard t
         copyToClipboard = liftIO $ terminalCopyClipboard t
@@ -121,6 +138,33 @@ main = do
                                 _       -> unHandled
             else unHandled
     _ <- t `on` resizeWindow $ resize t
+
+    _ <- window `on` configureEvent $ do
+        es <- eventSize
+        liftIO $ do
+            fontSize <- readIORef fsz
+            previousSize <- readIORef currentSize
+            let diff@(xDiff, yDiff) = tupleDiff es previousSize
+            writeIORef currentSize es
+            let diffFS :: Int
+                diffFS =
+                    if fst es < 400
+                        then 6
+                        else if fst es < 600
+                            then 8
+                            else if fst es < 800
+                                then 10
+                                else 12
+            let nFontSize = fontRange diffFS
+            putStrLn $ show es ++ " " ++ show diff ++ " " ++ show fontSize ++ " -> " ++ show nFontSize
+            setFont nFontSize
+        unHandled
+        {-
+        case compare (fst previousSize) (fst es) of
+            LT -> increaseFont >> unHandled
+            GT -> decreaseFont >> unHandled
+            EQ -> unHandled
+        -}
 
     terminalSetAllowBold t True
     terminalSetColorHighlight t (Color 0xffff 0xffff 0x0)
