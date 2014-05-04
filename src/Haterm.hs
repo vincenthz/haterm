@@ -156,7 +156,7 @@ main = do
                                 then 10
                                 else 12
             let nFontSize = fontRange diffFS
-            putStrLn $ show es ++ " " ++ show diff ++ " " ++ show fontSize ++ " -> " ++ show nFontSize
+            --putStrLn $ show es ++ " " ++ show diff ++ " " ++ show fontSize ++ " -> " ++ show nFontSize
             setFont nFontSize
         unHandled
         {-
